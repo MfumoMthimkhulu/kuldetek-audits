@@ -1,0 +1,479 @@
+'use client'
+import React from 'react'
+import {useState, useEffect} from 'react'
+import { useRouter } from "next/navigation";
+import { createClient } from '@/utils/supabase/client';
+import { toast } from "sonner";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from "@/components/ui/table";
+import { Card, CardContent } from "@/components/ui/card";
+
+export default function Analysis() {
+
+  const supabase = createClient();
+  const router = useRouter();
+  const [audits, setAudits] = useState([]);
+  const [auditId, setAuditId] = useState("");
+  const [findings, setFindings] = useState([]);
+  const [analysis, setAnalysis] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisType, setAnalysisType] = useState('');
+
+  useEffect(() => {
+    const fetchAudits = async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("audits")
+        .select("*")
+        .order("date", { ascending: false });
+
+      if (error) {
+        toast.error("Failed to fetch audits.");
+      } else {
+        setAudits(data);
+        
+      }
+    };
+
+    fetchAudits();
+  },[])
+
+  const handleAuditSelect = async (auditId) => {
+    setAuditId(auditId);
+    const {data:plan_data, error: plan_error} = await supabase.from('audit_plans').select('id').eq('audit_id',auditId);
+    if(plan_error){
+      console.log('error fetching plan id',plan_error)
+    }
+    const {data, error} = await supabase.from('audit_tasks').select("task, task_type, notes, findings, severity, recommendation").eq('plan_id',plan_data[0].id)
+    if(error){
+      console.log('error fetching finding info from tasks table',error)
+    }else{
+      setFindings(data)
+      console.log('findings data: ',data)
+      console.log(JSON.stringify(data, null, 2));
+      console.log('findings state: ',findings)
+    }
+    
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "Completed":
+        return "text-green-400";
+      case "In Progress":
+        return "text-blue-400";
+      case "scratch":
+        return "text-yellow-400";
+      default:
+        return "text-gray-400";
+    }
+  };
+
+  const getSeverityColor = (severity) => {
+    switch (severity?.toLowerCase()) {
+      case "high":
+        return "text-red-400";
+      case "medium":
+        return "text-yellow-400";
+      case "low":
+        return "text-green-400";
+      default:
+        return "text-gray-400";
+    }
+  };
+  // function to analyze data when button is clicked
+  const analyzeData = async () => {
+    setIsAnalyzing(true);
+    
+    try {
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          analysisType: analysisType,
+          data: findings,
+          model: 'openrouter/horizon-beta'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Analysis failed');
+      }
+
+      const result = await response.json();
+      
+             // Parse and structure the AI analysis result
+       const structuredAnalysis = parseAnalysisResult(result.result, analysisType);
+       setAnalysis(structuredAnalysis);
+    } catch (error) {
+      console.error('Error analyzing data:', error);
+      setAnalysis([
+        { 
+          metric: "Error", 
+          value: "Failed to analyze data. Please try again.", 
+          icon: "❌", 
+          color: "warning" 
+        }
+      ]);
+    }
+    
+    setIsAnalyzing(false);
+  };
+  const parseAnalysisResult = (result, type) => {
+    if (type === 'correlation') {
+      // Parse correlation analysis into structured sections
+      const sections = [];
+      const lines = result.split('\n');
+      let currentSection = null;
+      
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (!trimmedLine) continue;
+        
+        // Check for numbered sections
+        if (/^\d+\)/.test(trimmedLine)) {
+          if (currentSection) {
+            sections.push(currentSection);
+          }
+          currentSection = {
+            title: trimmedLine.split(')')[1]?.trim() || trimmedLine,
+            content: [],
+            icon: getSectionIcon(trimmedLine)
+          };
+        } else if (currentSection && trimmedLine.startsWith('-')) {
+          currentSection.content.push(trimmedLine.substring(1).trim());
+        } else if (currentSection && trimmedLine.startsWith('Observation:')) {
+          currentSection.observation = trimmedLine.substring('Observation:'.length).trim();
+        } else if (currentSection && trimmedLine.startsWith('Caveats')) {
+          sections.push(currentSection);
+          currentSection = {
+            title: 'Caveats',
+            content: [],
+            icon: '⚠️',
+            isWarning: true
+          };
+        } else if (currentSection) {
+          currentSection.content.push(trimmedLine);
+        }
+      }
+      
+      if (currentSection) {
+        sections.push(currentSection);
+      }
+      
+      return sections.map(section => ({
+        metric: section.title,
+        value: section.content.join('\n'),
+        observation: section.observation,
+        icon: section.icon,
+        color: section.isWarning ? 'warning' : 'info',
+        isStructured: true
+      }));
+    } else {
+      // For other analysis types, return as simple text
+      return [{
+        metric: `${type.charAt(0).toUpperCase() + type.slice(1)} Analysis`,
+        value: result,
+        icon: "🤖",
+        color: "info",
+        isLongText: true
+      }];
+    }
+  };
+
+  const getSectionIcon = (sectionText) => {
+    if (sectionText.includes('date')) return '📅';
+    if (sectionText.includes('distribution')) return '📊';
+    if (sectionText.includes('concentration')) return '🎯';
+    if (sectionText.includes('relationships')) return '🔗';
+    return '📋';
+  };
+
+  //this is to convert the objects to arrays
+  function valueToString(value) {
+    if (value === null || value === undefined) return 'None';
+  
+    if (typeof value === 'string' || typeof value === 'number') {
+      return String(value);
+    }
+  
+    if (Array.isArray(value)) {
+      return value.map(valueToString).join('\n');
+    }
+  
+    if (typeof value === 'object') {
+      // For objects, convert each key:value pair to string and join with newline
+      return Object.entries(value)
+        .map(([k, v]) => `${k}: ${valueToString(v)}`)
+        .join('\n');
+    }
+  
+    return String(value); // fallback
+  }
+  
+  function transformAnalysis(data) {
+    if (!data || typeof data !== 'object') return [];
+  
+    return Object.entries(data).map(([key, value]) => ({
+      metric: key,
+      value: valueToString(value),
+      isStructured: true,
+    }));
+  }
+  
+  
+  
+
+  return (
+    <div className="max-w-6xl mx-auto">
+      <Card className="bg-[#1e293b] border border-[#334155] text-white">
+        <CardContent className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h2 className="text-xl font-semibold">Audit Analysis</h2>
+              <p className="text-sm text-gray-400">
+                Select an audit to view findings and analysis
+              </p>
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <Select value={auditId} onValueChange={handleAuditSelect}>
+              <SelectTrigger className="w-full bg-[#0f172a] border-[#334155] text-white">
+                <SelectValue placeholder="Choose an audit to analyze..." />
+              </SelectTrigger>
+              <SelectContent className="bg-[#1e293b] border-[#334155] max-h-96">
+                {audits.map((audit) => (
+                  <SelectItem 
+                    key={audit.id} 
+                    value={audit.id}
+                    className="text-white hover:bg-[#334155] focus:bg-[#334155] cursor-pointer"
+                  >
+                    <div className="flex flex-col space-y-1 py-2">
+                      <div className="flex justify-between items-start">
+                        <span className="font-semibold text-white">{audit.title}</span>
+                      
+                      </div>
+                      <div className="flex justify-between items-center text-sm text-gray-300">
+                        <span>Category: {audit.category}</span>
+                        <span>Date: {audit.date}</span>
+                      </div>
+                      <div className="text-sm text-gray-400">
+                        Auditor: {audit.auditor}
+                      </div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {auditId && (
+            <div className="mb-6 p-4 bg-[#0f172a] border border-[#334155] rounded-lg">
+              <h3 className="text-lg font-semibold text-white mb-2">Selected Audit Details</h3>
+              {(() => {
+                const selectedAudit = audits.find(audit => audit.id === auditId);
+                if (!selectedAudit) return null;
+                
+                return (
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-300">Title:</span>
+                      <span className="text-white">{selectedAudit.title}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-300">Category:</span>
+                      <span className="text-white">{selectedAudit.category}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-300">Status:</span>
+                      <span className={`font-medium ${getStatusColor(selectedAudit.status)}`}>
+                        {selectedAudit.status}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-300">Date:</span>
+                      <span className="text-white">{selectedAudit.date}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-300">Auditor:</span>
+                      <span className="text-white">{selectedAudit.auditor}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {findings.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-xl font-semibold text-white mb-4">Audit Findings & Tasks</h3>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="text-gray-400 border-b border-[#334155]">
+                      <TableHead className="text-white">Task</TableHead>
+                      <TableHead className="text-white">Type</TableHead>
+                      <TableHead className="text-white">Findings</TableHead>
+                      <TableHead className="text-white">Severity</TableHead>
+                      <TableHead className="text-white">Recommendation</TableHead>
+                      <TableHead className="text-white">Notes</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {findings.map((finding, index) => (
+                      <TableRow
+                        key={index}
+                        className="border-b border-[#334155] hover:bg-[#0f172a] transition"
+                      >
+                        <TableCell className="text-white max-w-xs">
+                          <div className="break-words">
+                            {finding.task || 'N/A'}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-gray-300">
+                          {finding.task_type || 'N/A'}
+                        </TableCell>
+                        <TableCell className="text-white max-w-xs">
+                          <div className="break-words">
+                            {finding.findings || 'N/A'}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className={`font-medium ${getSeverityColor(finding.severity)}`}>
+                            {finding.severity || 'N/A'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-white max-w-xs">
+                          <div className="break-words">
+                            {finding.recommendation || 'N/A'}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-gray-300 max-w-xs">
+                          <div className="break-words">
+                            {finding.notes || 'N/A'}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+
+          {auditId && findings.length === 0 && (
+            <div className="mt-6 p-4 bg-[#0f172a] border border-[#334155] rounded-lg">
+              <p className="text-gray-300 text-center">No findings or tasks found for this audit.</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      {auditId && (
+      <div className="flex flex-col gap-4 p-4 bg-card border border-border rounded-lg shadow-sm">
+  <div className="flex items-center gap-6">
+    {/* Select control */}
+    <div className="flex flex-col gap-1">
+      <label
+        htmlFor="analysisType"
+        className="text-sm font-medium text-muted-foreground"
+      >
+        Analysis Type:
+      </label>
+      <select
+        id="analysisType"
+        value={analysisType}
+        onChange={(e) => setAnalysisType(e.target.value)}
+        disabled={isAnalyzing}
+        className="px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:ring-2 focus:ring-ring focus:outline-none disabled:opacity-50"
+      >
+        <option value="" disabled>
+        -- Select analysis type --
+        </option>
+        <option value="summary">Summary</option>
+        <option value="riskAssessment">riskAssessment</option>
+        <option value="controlEffectiveness">controlEffectiveness</option>
+        <option value="complianceCheck">complianceCheck</option>
+        <option value="recommendations">recommendations</option>
+        
+
+      </select>
+    </div>
+
+    {/* Analyze button */}
+    <button
+      onClick={analyzeData}
+      disabled={isAnalyzing}
+      className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+    >
+      {isAnalyzing ? (
+        <>
+          <span className="animate-spin h-4 w-4 border-2 border-t-transparent border-primary-foreground rounded-full"></span>
+          Analyzing...
+        </>
+      ) : (
+        <>
+          <span className="text-lg">🔍</span>
+          Analyze Audit Findings
+        </>
+      )}
+    </button>
+  </div>
+</div>)}
+{analysis && (
+  <div className="mt-8">
+    <h2 className="text-xl font-semibold text-foreground mb-4">
+      Analysis Results
+    </h2>
+    <button
+      onClick={() => setAnalysis(null)}
+      className="px-3 py-1 text-sm rounded-md bg-destructive text-destructive-foreground hover:opacity-90 transition-colors"
+    >
+      Close
+    </button>
+
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {transformAnalysis(analysis).map((item, index) => (
+        <div
+          key={index}
+          className={`flex flex-col gap-3 p-4 rounded-lg border border-border bg-card shadow-sm`}
+        >
+          <div className="flex flex-col gap-2">
+            <h3 className="text-base font-medium text-foreground">
+              {item.metric}
+            </h3>
+            <div className="space-y-1 text-sm text-muted-foreground">
+              {item.value.split("\n").map((line, lineIndex) => (
+                <p key={lineIndex} className="leading-relaxed">
+                  {line}
+                </p>
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
+
+
+    </div>
+  )
+}
+

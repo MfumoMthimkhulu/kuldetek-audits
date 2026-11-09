@@ -1,0 +1,38 @@
+[33mbea7f27[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32maudit-activities[m[33m, [m[1;31morigin/Audit-report[m[33m)[m HEAD@{0}: pull origin Audit-report: Fast-forward
+[33md16c62b[m[33m ([m[1;31morigin/audit-activities[m[33m)[m HEAD@{1}: commit: Messaging feature, updated dashboard.
+[33mc5b9bfb[m HEAD@{2}: commit: No errors
+[33mf5f33bc[m HEAD@{3}: commit: No errors
+[33m38bc2b5[m HEAD@{4}: commit: No errors
+[33mb2cb1b8[m HEAD@{5}: commit: No errors
+[33m68a7640[m HEAD@{6}: commit: fix(next): force-dynamic for client-hook pages to avoid prerender errors on Netlify
+[33m9841f76[m HEAD@{7}: commit: Deploy error
+[33mbc8bef2[m HEAD@{8}: pull origin master: Fast-forward
+[33mb0d2991[m HEAD@{9}: commit: Light mode and dark mode working with minor fixes needed
+[33mb7888a3[m HEAD@{10}: commit: Updated mjs cofig
+[33m7311c4e[m HEAD@{11}: commit: Updates
+[33m9f09ea4[m HEAD@{12}: commit: Updates
+[33m7d166eb[m HEAD@{13}: commit: Updates
+[33m8508db0[m HEAD@{14}: commit: Updates
+[33mfc9fee8[m HEAD@{15}: pull origin master: Fast-forward
+[33m293da21[m HEAD@{16}: commit: Audit Analysis now has CRUD abilities and can be shared to other users
+[33m0ff9b95[m HEAD@{17}: commit: Auditor can now be assigned to tasks
+[33m4d94456[m HEAD@{18}: pull origin master: Fast-forward
+[33mc6cec6e[m HEAD@{19}: commit: Audit analysis now structured correctly and displayed correctly - needs review
+[33mbac8a8c[m HEAD@{20}: pull origin master: Fast-forward
+[33m29b86eb[m HEAD@{21}: commit: feat(audit): Enable task completion and progress tracking with toast feedback via Sonner
+[33m99ca828[m HEAD@{22}: commit: Front end for admin panel with error, user can now update their profile, styling for audit plan and pdf fixed.
+[33m4237e49[m HEAD@{23}: commit: Complete audit plan with PDF generation functionality
+[33m2a35b0e[m HEAD@{24}: commit (merge): Audit Plan fully complete in need of pdf generation
+[33mad913e5[m HEAD@{25}: commit: My Changes
+[33m51df83c[m HEAD@{26}: commit: audit activities
+[33m7264029[m[33m ([m[1;32mmaster[m[33m)[m HEAD@{27}: checkout: moving from master to audit-activities
+[33m7264029[m[33m ([m[1;32mmaster[m[33m)[m HEAD@{28}: commit: feat: Launch audit plan from sidebar tab and add default templates
+[33m149dac8[m HEAD@{29}: pull: Fast-forward
+[33md49adee[m HEAD@{30}: reset: moving to HEAD
+[33md49adee[m HEAD@{31}: commit: Add route protection for authenticated access; update sidebar links to navigate to corresponding pages
+[33mb99272f[m HEAD@{32}: pull: Fast-forward
+[33m9918a23[m HEAD@{33}: commit: Roles column now exists and user role is automatically assigned to a user that signs up
+[33mc7169b1[m HEAD@{34}: commit: Sign-up altered according to the requirements of the system
+[33mbf15266[m HEAD@{35}: commit: main error gone
+[33m8953c9d[m HEAD@{36}: commit: first commit
+[33m99e2034[m HEAD@{37}: commit (initial): Initial commit from Create Next App
